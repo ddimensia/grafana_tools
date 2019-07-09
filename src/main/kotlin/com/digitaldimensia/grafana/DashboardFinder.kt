@@ -1,6 +1,5 @@
 package com.digitaldimensia.grafana
 
-import com.digitaldimensia.grafana.model.Dashboard
 import com.digitaldimensia.grafana.model.DashboardMetadata
 import com.digitaldimensia.grafana.model.GrafanaCommandParams
 import com.github.ajalt.clikt.output.TermUi
@@ -11,7 +10,7 @@ import com.github.kittinunf.fuel.jackson.responseObject
 class DashboardFinder (params: GrafanaCommandParams, val datasourceName: String) {
     val url: String = params.url
     val dryRun: Boolean = params.dryRun
-
+    val regex: Regex = "\"datasource\"\\s*:\\s*\"$datasourceName\"".toRegex()
     fun run() {
         var page = 0
         var resultCount = 1000
@@ -29,9 +28,8 @@ class DashboardFinder (params: GrafanaCommandParams, val datasourceName: String)
                     resultCount = result.value.size
                     TermUi.echo("Found ${resultCount} dashboards.")
                     for (dashboard in result.value) {
-                        val datasources = findDatasources(dashboard)
-                        if (datasources.contains(datasourceName)) {
-                            TermUi.echo("Dashboard ${dashboard.title}, ${datasources}")
+                        if (findDatasources(dashboard) == true) {
+                            TermUi.echo("Dashboard ${dashboard.title}")
                         }
                     }
                 }
@@ -44,25 +42,19 @@ class DashboardFinder (params: GrafanaCommandParams, val datasourceName: String)
         }
     }
 
-    fun findDatasources(dashboard: DashboardMetadata): Set<String> {
+    fun findDatasources(dashboard: DashboardMetadata): Boolean? {
         val request = Fuel.get("$url/api/dashboards/uid/${dashboard.uid}")
 
-        val (_, _, result) = request.responseObject<Dashboard>()
+        val (_, _, result) = request.responseString()
 
         return when(result) {
             is Result.Success -> {
-                (result.value.dashboard.rows?.flatMap { row ->
-                    row.panels?.map { panel ->
-                        panel.datasource ?: "default"
-                    } ?: emptyList()
-                } ?: emptyList()).union(result.value.dashboard.panels?.map { panel ->
-                    panel.datasource ?: "default"
-                } ?: emptyList())
+                result.value.contains(regex)
             }
             is Result.Failure -> {
                 TermUi.echo("Failed to get dashboard ${dashboard.uid}", err = true)
                 TermUi.echo("Failure: ${result.error}", err = true)
-                emptySet()
+                return null
             }
         }
     }
