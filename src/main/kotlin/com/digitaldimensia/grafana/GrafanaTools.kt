@@ -6,10 +6,12 @@ import com.github.ajalt.clikt.core.findObject
 import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.options.*
+import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.clikt.parameters.types.int
+import java.io.File
 
 fun main(args: Array<String>) {
-    GrafanaTools().subcommands(FindDashboards()).main(args)
+    GrafanaTools().subcommands(FindDashboards(), FindUnusedInfluxTables()).main(args)
 }
 
 class GrafanaTools : CliktCommand() {
@@ -33,5 +35,14 @@ class FindDashboards : CliktCommand(name = "findDashboards", help = "Find dashbo
     private val config by requireObject<GrafanaCommandParams>()
     override fun run() {
         DashboardFinder(config, datasourceName).run()
+    }
+}
+
+class FindUnusedInfluxTables : CliktCommand(name = "unusedTables", help = "Find unused tables for an influx datasource") {
+    private val datasourceName: String by option("-d", "--datasource", help = "Datasource name").required()
+    private val tableFile: File by option("-t", "--tablefile", help = "Json file containing table to filenames").file().required()
+    private val config by requireObject<GrafanaCommandParams>()
+    override fun run() {
+        InfluxTableFinder(config, datasourceName, tableFile).run()
     }
 }
