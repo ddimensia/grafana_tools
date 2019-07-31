@@ -10,7 +10,7 @@ import com.github.kittinunf.fuel.jackson.defaultMapper
 import com.github.kittinunf.fuel.jackson.responseObject
 import java.io.File
 
-class InfluxTableFinder(params: GrafanaCommandParams, datasourceName: String, val tableFile: File) {
+class InfluxTableFinder(params: GrafanaCommandParams, val datasourceName: String, val tableFile: File) {
     val url: String = params.url
     val regex: Regex = "\"datasource\"\\s*:\\s*\"$datasourceName\"".toRegex()
     fun run() {
@@ -39,7 +39,7 @@ class InfluxTableFinder(params: GrafanaCommandParams, datasourceName: String, va
                     for (dashboard in result.value) {
                         val dashboardTables = findTables(dashboard)
                         if (dashboardTables != null) {
-                            if (dashboardTables.isEmpty()) {
+                            if (dashboardTables.isEmpty() && dashboard.tags.contains("siphon")) {
                                 outdatedDashboards.add(dashboard.title)
                             } else {
                                 dashboardTables
@@ -84,7 +84,7 @@ class InfluxTableFinder(params: GrafanaCommandParams, datasourceName: String, va
         TermUi.echo("Outdated Dashboards: ${defaultMapper.writeValueAsString(outdatedDashboards)}")
         TermUi.echo("Unused tables: ${defaultMapper.writeValueAsString(pystFilesWithUnusedTables)}")
         TermUi.echo("Deletable pyst files: ${defaultMapper.writeValueAsString(deletablePystFiles)}")
-
+        TermUi.echo("Total unused tables: ${tableMap.size}")
     }
 
     private fun findTables(dashboard: DashboardMetadata): List<String>? {
@@ -141,11 +141,12 @@ class InfluxTableFinder(params: GrafanaCommandParams, datasourceName: String, va
     }
 
     private fun processPanel(panel: Panel): List<String> {
-        val tableRegex = "(?:FROM|from)\\s+\\\"?autogen\\\"?.([^\\s]+)\\s+(?:WHERE|where)".toRegex()
+        val tableRegex = "(?:FROM|from)\\s+\"?autogen\"?\\.\\s*([^\\s]+)\\s+(?:WHERE|where)".toRegex()
+        val panelDS = panel.datasource
         return panel.targets?.map { target ->
-            if (target.has("dsType") && target["dsType"].textValue() == "influxdb") {
+            if ((target.hasNonNull("datasource") && target["datasource"].textValue() == datasourceName) || panelDS == datasourceName) {
                 if (target.has("rawQuery") && target["rawQuery"].isBoolean && target["rawQuery"].booleanValue()) {
-                    val query = target["query"].textValue()
+                    val query = target["query"].textValue().replace("\n", " ")
                     val matchResult = tableRegex.find(query)
                     if (matchResult != null) {
                         matchResult.groupValues[1].replace("\"", "")

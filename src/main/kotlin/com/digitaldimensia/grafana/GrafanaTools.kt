@@ -1,11 +1,14 @@
 package com.digitaldimensia.grafana
 
 import com.digitaldimensia.grafana.model.GrafanaCommandParams
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.findObject
 import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.options.*
+import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.clikt.parameters.types.int
 import java.io.File
@@ -32,15 +35,28 @@ class GrafanaTools : CliktCommand() {
 
 class FindDashboards : CliktCommand(name = "findDashboards", help = "Find dashboards using a specified datasource") {
     private val datasourceName: String by option("-d", "--datasource", help = "Datasource name").required()
+    private val datasourceType: DatasourceType? by option(
+        "-t",
+        "--type",
+        help = "Datasource type (e.g. influx)"
+    ).choice(
+        "influx" to DatasourceType.INFLUX,
+        "kairos" to DatasourceType.KAIROS
+    )
+    private val metrics: List<String>? by option("-m", "--metric", help = "Metric name regex").multiple()
     private val config by requireObject<GrafanaCommandParams>()
     override fun run() {
-        DashboardFinder(config, datasourceName).run()
+        DashboardFinder(config, datasourceName, datasourceType, metrics).run()
     }
 }
 
 class FindUnusedInfluxTables : CliktCommand(name = "unusedTables", help = "Find unused tables for an influx datasource") {
     private val datasourceName: String by option("-d", "--datasource", help = "Datasource name").required()
-    private val tableFile: File by option("-t", "--tablefile", help = "Json file containing table to filenames").file().required()
+    private val tableFile: File by option(
+        "-t",
+        "--tablefile",
+        help = "Json file containing table to filenames"
+    ).file().required()
     private val config by requireObject<GrafanaCommandParams>()
     override fun run() {
         InfluxTableFinder(config, datasourceName, tableFile).run()

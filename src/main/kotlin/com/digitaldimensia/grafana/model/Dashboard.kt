@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode
 
 data class Dashboard ( val dashboard: DashboardDef )
 
-data class DashboardDef(val rows: List<DashboardRow>?, val panels: List<Panel>?, val templating: Templating?)
+data class DashboardDef(val rows: List<DashboardRow>?, val panels: List<Panel>?, val templating: Templating?, val tags: List<String>?)
 
 data class DashboardRow(val panels: List<Panel>?)
 
